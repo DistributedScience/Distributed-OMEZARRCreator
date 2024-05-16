@@ -33,6 +33,8 @@ if "DOWNLOAD_FILES" not in os.environ:
 else:
     DOWNLOAD_FILES = os.environ["DOWNLOAD_FILES"]
 
+local_root = "/home/ubuntu/local"
+os.makedirs(local_root, exist_ok=True)
 
 #################################
 # CLASS TO HANDLE THE SQS QUEUE
@@ -122,49 +124,87 @@ def runSomething(message):
                 return "SUCCESS"
         except KeyError:  # Returned if that folder does not exist
             pass
+    if "downsample_only" in message.keys():
+        if not message["downsample_only"]:
+            # Download files
+            printandlog("Downloading files", logger)
+            plate_path = os.path.join(message["input_location"], message["plate"])
+            local_plate_path = os.path.join(local_root, message["plate"])
+            os.makedirs(local_plate_path, exist_ok=True)
 
-    # Download files
-    printandlog("Downloading files", logger)
-    plate_path = os.path.join(message["input_location"], message["plate"])
-    local_root = "/home/ubuntu/local"
-    local_plate_path = os.path.join(local_root, message["plate"])
-    os.makedirs(local_plate_path, exist_ok=True)
+            cmd = f'aws s3 cp s3://{message["input_bucket"]}/{plate_path} {local_plate_path} --recursive'
+            printandlog(f"Running {cmd}", logger)
+            logger.info(cmd)
+            subp = subprocess.Popen(
+                cmd.split(), stdout=subprocess.PIPE, stderr=subprocess.STDOUT
+            )
+            monitorAndLog(subp, logger)
 
-    cmd = f'aws s3 cp s3://{message["input_bucket"]}/{plate_path} {local_plate_path} --recursive'
-    printandlog(f"Running {cmd}", logger)
-    logger.info(cmd)
-    subp = subprocess.Popen(
-        cmd.split(), stdout=subprocess.PIPE, stderr=subprocess.STDOUT
-    )
-    monitorAndLog(subp, logger)
+            # Build and run the program's command
+            # Use os.path.join to account for trailing slashes on inputs
+            flags = ""
+            if message["resolutions"]:
+                flags = flags + f" --resolutions {message['resolutions']}"
+            if message["tile_width"]:
+                flags = flags + f" --tile_width {message['tile_width']}"
+            if message["tile_height"]:
+                flags = flags + f" --tile_height {message['tile_height']}"
+            if message["target-min-size"]:
+                flags = flags + f" --target-min-size {message['target-min-size']}"
+            if message["additional_flags"]:
+                flags = flags + f" {message['additional_flags']}"
+            index_path = os.path.join(local_plate_path, message["path_to_metadata"])
+            zarr_path = os.path.join(local_root, f"{message['plate']}.ome.zarr")
+            cmd = (
+                f"/usr/local/bin/_entrypoint.sh bioformats2raw {index_path} {zarr_path} {flags}"
+            )
 
-    # Build and run the program's command
-    # Use os.path.join to account for trailing slashes on inputs
-    flags = ""
-    if message["resolutions"]:
-        flags = flags + f" --resolutions {message['resolutions']}"
-    if message["tile_width"]:
-        flags = flags + f" --tile_width {message['tile_width']}"
-    if message["tile_height"]:
-        flags = flags + f" --tile_height {message['tile_height']}"
-    if message["target-min-size"]:
-        flags = flags + f" --target-min-size {message['target-min-size']}"
-    if message["additional_flags"]:
-        flags = flags + f" {message['additional_flags']}"
-    index_path = os.path.join(local_plate_path, message["path_to_metadata"])
-    zarr_path = os.path.join(local_root, f"{message['plate']}.ome.zarr")
-    cmd = (
-        f"/usr/local/bin/_entrypoint.sh bioformats2raw {index_path} {zarr_path} {flags}"
-    )
+            printandlog(f"Running {cmd}", logger)
+            logger.info(cmd)
+            subp = subprocess.Popen(
+                cmd.split(), stdout=subprocess.PIPE, stderr=subprocess.STDOUT
+            )
+            monitorAndLog(subp, logger)
 
-    printandlog(f"Running {cmd}", logger)
-    logger.info(cmd)
-    subp = subprocess.Popen(
-        cmd.split(), stdout=subprocess.PIPE, stderr=subprocess.STDOUT
-    )
-    monitorAndLog(subp, logger)
+            printandlog("Finished with .ome.zarr creation.", logger)
 
-    printandlog("Finished with .ome.zarr creation.", logger)
+            # If adding downsample
+            if message["downsample_after"]:
+                cmd = (
+                    f"python3 add_downsampling.py {zarr_path} {message['downsample_scale']}"
+                )
+
+                printandlog(f"Downsampling. Running {cmd}", logger)
+                logger.info(cmd)
+                subp = subprocess.Popen(
+                    cmd.split(), stdout=subprocess.PIPE, stderr=subprocess.STDOUT
+                )
+                monitorAndLog(subp, logger)
+        else:
+            # Download .ome.zarr
+            printandlog("Downloading .ome.zarr", logger)
+            plate_path = os.path.join(message["input_location"], f'{message["plate"]}.ome.zarr')
+            zarr_path = os.path.join(local_root, f'{message["plate"]}.ome.zarr')
+
+            cmd = f'aws s3 cp s3://{message["input_bucket"]}/{plate_path} {zarr_path} --recursive'
+            printandlog(f"Running {cmd}", logger)
+            logger.info(cmd)
+            subp = subprocess.Popen(
+                cmd.split(), stdout=subprocess.PIPE, stderr=subprocess.STDOUT
+            )
+            monitorAndLog(subp, logger)
+
+            cmd = (
+                f"python3 add_downsampling.py {zarr_path} {message['downsample_scale']}"
+            )
+
+            printandlog(f"Downsampling. Running {cmd}", logger)
+            logger.info(cmd)
+            subp = subprocess.Popen(
+                cmd.split(), stdout=subprocess.PIPE, stderr=subprocess.STDOUT
+            )
+            monitorAndLog(subp, logger)
+
 
     # If done, get the outputs and move them to S3
     s3path = os.path.join(

@@ -6,7 +6,7 @@
 #
 
 
-FROM openmicroscopy/bioformats2raw:0.5.0
+FROM openmicroscopy/bioformats2raw:0.9.1
 
 # Install S3FS
 USER root
@@ -27,6 +27,9 @@ RUN apt-get -y update           && \
 
 RUN apt install -y python3.9-dev python3.9-distutils python3-pip
 
+# Install add_downsampling dependencies
+RUN python3.9 -m pip install dask zarr ome-zarr
+
 # Install AWS CLI
 RUN python3.9 -m pip install awscli
 
@@ -45,6 +48,7 @@ WORKDIR /home/ubuntu
 COPY B2R-worker.py .
 COPY instance-monitor.py .
 COPY run-worker.sh .
+COPY add_downsampling.py .
 RUN chmod 755 run-worker.sh
 
 WORKDIR /home/ubuntu

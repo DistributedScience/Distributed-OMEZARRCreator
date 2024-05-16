@@ -97,7 +97,7 @@ def generate_task_definition(AWS_PROFILE):
             }]
 
     sqs = boto3.client('sqs')
-    queue_name = get_queue_url(sqs)
+    queue_name = get_queue_url(sqs, SQS_QUEUE_NAME)
     task_definition['containerDefinitions'][0]['environment'] += [
         {
             'name': 'APP_NAME',
@@ -193,6 +193,12 @@ def get_or_create_queue(sqs):
         time.sleep(WAIT_TIME)
     else:
         print('Queue exists')
+
+def loadConfig(configFile):
+    data = None
+    with open(configFile, 'r') as conf:
+        data = json.load(conf)
+    return data
 
 def killdeadAlarms(fleetId,monitorapp,ec2,cloud):
     todel=[]
@@ -556,7 +562,7 @@ def startCluster():
     createMonitor.write('"MONITOR_QUEUE_NAME" : "'+SQS_QUEUE_NAME+'",\n')
     createMonitor.write('"MONITOR_BUCKET_NAME" : "'+AWS_BUCKET+'",\n')
     createMonitor.write('"MONITOR_LOG_GROUP_NAME" : "'+LOG_GROUP_NAME+'",\n')
-    createMonitor.write('"MONITOR_START_TIME" : "'+ starttime+'"}\n')
+    createMonitor.write('"MONITOR_START_TIME" : "'+ starttime+'",\n')
     createMonitor.write('"CLEAN_DASHBOARD" : "'+ CLEAN_DASHBOARD+'"}\n')
     createMonitor.close()
 
