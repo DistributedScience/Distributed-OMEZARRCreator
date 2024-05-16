@@ -48,6 +48,12 @@ Otherwise set to `false`.
 * **additional_flags:** Enter any additional flags you want passed to BioFormats2Raw.
 Otherwise set to `false`.
 (e.g. `--extra-readers com.glencoesoftware.bioformats2raw.MiraxReader --series 0,2,3,4`)
+* **downsample_after:** Enter `true` if you would like to add an additional, single downsampled resolution after your .ome.zarr files have been created.
+Otherwise set to `false`.
+* **downsample_only:** Enter `true` if you don't need to create .ome.zarr's but instead want to download them from the input_bucket and add a single downsampled resolution.
+Otherwise set to `false`.
+* **downsample_scale:** Enter a value for your single downsample resolution.
+(e.g. `8`)
 * **plates:** The list of all the plates you'd like to process.
 Each plate is an individual task and will be run in parallel.
 (e.g. `["PLATE1", "PLATE2", "PLATE3"]`)

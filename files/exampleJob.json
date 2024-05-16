@@ -17,6 +17,11 @@
   "_comment_on_additional_flags": "Enter any additional flags you want passed to BioFormats2Raw. Otherwise set to false.",
   "_comment_on_additional_flags2": "e.g. --extra-readers com.glencoesoftware.bioformats2raw.MiraxReader",
   "additional_flags": false,
+  "_comment_on_downsample_after": "true if you want to add an additional downsampled resolution after .ome.zarr creation.",
+  "_comment_on_downsample_only": "true if you want to download already-created .ome.zarr files and downsample them.",
+  "downsample_after": false,
+  "downsample_only": false,
+  "downsample_scale": 8,
   "_comment_on_plates": "Each plate is an individual task and will be run in parallel",
   "plates": ["PLATEA","PLATEB","PLATEC","PLATED"]
 }
